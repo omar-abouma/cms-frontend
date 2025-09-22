@@ -44,13 +44,16 @@ const Login = ({ onLogin }) => {
       const data = await response.json();
 
       if (response.ok) {
+        // ✅ Store tokens
         localStorage.setItem('authToken', data.access);
         localStorage.setItem('refreshToken', data.refresh);
         localStorage.setItem('userData', JSON.stringify({ username: credentials.username }));
 
+        // ✅ Notify parent & navigate
         onLogin(data);
         navigate('/dashboard');
       } else {
+        // ❌ Display API error
         setLoginError(data.detail || 'Invalid username or password');
       }
     } catch (error) {
@@ -99,7 +102,11 @@ const Login = ({ onLogin }) => {
 
           {loginError && <div className="login-error">{loginError}</div>}
 
-          <button type="submit" className={`login-button ${isSubmitting ? 'submitting' : ''}`} disabled={isSubmitting}>
+          <button
+            type="submit"
+            className={`login-button ${isSubmitting ? 'submitting' : ''}`}
+            disabled={isSubmitting}
+          >
             {isSubmitting ? <><span className="spinner"></span> Logging in...</> : 'Login'}
           </button>
         </form>

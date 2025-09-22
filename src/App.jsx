@@ -23,28 +23,105 @@ function App() {
 
   // Check for existing authentication on app load
   useEffect(() => {
-    const token = localStorage.getItem('authToken');
-    const storedUserData = localStorage.getItem('userData');
-    
-    if (token && storedUserData) {
-      setIsAuthenticated(true);
-      setUserData(JSON.parse(storedUserData));
-    }
-    setIsLoading(false);
+    const checkAuth = async () => {
+      const token = localStorage.getItem('access_token');
+      const storedUserData = localStorage.getItem('userData');
+      
+      if (token && storedUserData) {
+        // Verify token is still valid by making a simple API call
+        try {
+          const response = await fetch('http://localhost:8000/api/profile/', {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+            },
+          });
+
+          if (response.ok) {
+            const userDataFromApi = await response.json();
+            setIsAuthenticated(true);
+            setUserData(userDataFromApi);
+            // Update localStorage with fresh user data
+            localStorage.setItem('userData', JSON.stringify(userDataFromApi));
+          } else if (response.status === 401) {
+            // Token might be expired, try to refresh it
+            await refreshToken();
+          } else {
+            console.error('Auth check failed with status:', response.status);
+            handleLogout();
+          }
+        } catch (error) {
+          console.error('Auth check failed:', error);
+          handleLogout();
+        }
+      } else {
+        // No token or user data found
+        handleLogout();
+      }
+      setIsLoading(false);
+    };
+
+    checkAuth();
   }, []);
 
-  const handleLogin = (loginData) => {
+  const refreshToken = async () => {
+    try {
+      const refreshToken = localStorage.getItem('refresh_token');
+      if (!refreshToken) {
+        throw new Error('No refresh token');
+      }
+
+      const response = await fetch('http://localhost:8000/api/token/refresh/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ refresh: refreshToken }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        localStorage.setItem('access_token', data.access);
+        
+        // Get updated user data
+        const userResponse = await fetch('http://localhost:8000/api/profile/', {
+          headers: {
+            'Authorization': `Bearer ${data.access}`,
+          },
+        });
+
+        if (userResponse.ok) {
+          const userData = await userResponse.json();
+          setIsAuthenticated(true);
+          setUserData(userData);
+          localStorage.setItem('userData', JSON.stringify(userData));
+          return true;
+        } else {
+          throw new Error('Failed to fetch user profile after token refresh');
+        }
+      } else {
+        throw new Error('Token refresh failed');
+      }
+    } catch (error) {
+      console.error('Token refresh error:', error);
+      handleLogout();
+      return false;
+    }
+  };
+
+  const handleLogin = async (loginData) => {
+    // loginData should contain { access, refresh, user }
+    localStorage.setItem('access_token', loginData.access);
+    localStorage.setItem('refresh_token', loginData.refresh);
+    localStorage.setItem('userData', JSON.stringify(loginData.user));
+    
     setIsAuthenticated(true);
-    setUserData({
-      userId: loginData.user_id,
-      username: loginData.username,
-      email: loginData.email
-    });
+    setUserData(loginData.user);
   };
 
   const handleLogout = () => {
-    // Clear localStorage
-    localStorage.removeItem('authToken');
+    // Clear all authentication data from localStorage
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
     localStorage.removeItem('userData');
     
     // Reset state

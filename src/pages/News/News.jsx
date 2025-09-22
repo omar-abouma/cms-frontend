@@ -1,399 +1,188 @@
-import React, { useState, useEffect } from "react";
-import axios from "axios";
+import React, { useState, useEffect, useRef } from "react";
 import "./News.css";
 
-const API = axios.create({
-  baseURL: "http://127.0.0.1:8000/api/",
-});
+const API_BASE = "http://localhost:8000";
 
-const NEWS_FIELDS = [
-  { name: "title", type: "text", placeholder: "News Title", required: true },
-  { name: "summary", type: "textarea", placeholder: "News Summary" },
-  { name: "content", type: "textarea", placeholder: "Full Content" },
-  { name: "image", type: "file", placeholder: "News Image" },
-  { name: "status", type: "select", options: ["Draft", "Published"] }
-];
-
-const News = () => {
-  const [items, setItems] = useState([]);
-  const [newItem, setNewItem] = useState({});
-  const [isEditing, setIsEditing] = useState(false);
+export default function NewsManagement() {
+  const token = localStorage.getItem("access_token");
+  const [newsList, setNewsList] = useState([]);
   const [editingId, setEditingId] = useState(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [success, setSuccess] = useState(null);
-  const [imagePreview, setImagePreview] = useState(null);
+  const [formData, setFormData] = useState({
+    title: "",
+    date: "",
+    status: "draft", // match backend
+    short_text: "",
+    full_text: "",
+    image: null,
+  });
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [error, setError] = useState("");
+  const fileInputRef = useRef(null);
 
-  useEffect(() => {
-    fetchItems();
-  }, []);
-
-  const fetchItems = async () => {
-    setIsLoading(true);
+  // Fetch all news
+  const fetchNews = async () => {
     try {
-      const response = await API.get("news/");
-      setItems(response.data);
-      setError(null);
+      const res = await fetch(`${API_BASE}/api/news/`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      setNewsList(data.results || data);
     } catch (err) {
-      console.error("Error fetching news:", err);
-      setError("Failed to fetch news. Please try again.");
-    } finally {
-      setIsLoading(false);
+      console.error(err);
     }
   };
 
-  const handleChange = (e) => {
-    const { name, value, type, files } = e.target;
-    
-    if (type === "file") {
-      const file = files[0];
-      setNewItem({ ...newItem, [name]: file });
-      
-      // Create image preview
-      if (file) {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          setImagePreview(reader.result);
-        };
-        reader.readAsDataURL(file);
-      } else {
-        setImagePreview(null);
-      }
-    } else {
-      setNewItem({ ...newItem, [name]: value });
-    }
-  };
+  useEffect(() => { fetchNews(); }, []);
 
-  const resetForm = () => {
-    setNewItem({});
-    setIsEditing(false);
-    setEditingId(null);
-    setImagePreview(null);
-    setError(null);
-    setSuccess(null);
-  };
-
-  const buildFormData = (data) => {
-    const formData = new FormData();
-    
-    Object.keys(data).forEach(key => {
-      if (data[key] !== null && data[key] !== undefined) {
-        formData.append(key, data[key]);
-      }
-    });
-    
-    return formData;
-  };
-
-  const getHeaders = () => {
-    return {
-      "Content-Type": "multipart/form-data",
-    };
-  };
-
+  // Create or Update news
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setIsLoading(true);
-    
+    setError("");
+
     try {
-      const formData = buildFormData(newItem);
-      
-      if (isEditing) {
-        await API.put(`news/${editingId}/`, formData, {
-          headers: getHeaders()
-        });
-        setSuccess("News article updated successfully!");
-      } else {
-        await API.post("news/", formData, {
-          headers: getHeaders()
-        });
-        setSuccess("News article created successfully!");
+      const fd = new FormData();
+      Object.entries(formData).forEach(([k,v]) => { if(v) fd.append(k,v); });
+
+      const url = editingId ? `${API_BASE}/api/news/${editingId}/` : `${API_BASE}/api/news/`;
+      const method = editingId ? "PUT" : "POST";
+
+      const res = await fetch(url, {
+        method,
+        headers: { Authorization: `Bearer ${token}` },
+        body: fd,
+      });
+
+      if(!res.ok) {
+        const data = await res.json();
+        throw new Error(data.status ? data.status.join(", ") : "Failed to save news");
       }
-      
+
       resetForm();
-      fetchItems();
+      fetchNews();
     } catch (err) {
-      console.error("Error saving news article:", err);
-      setError(`Failed to ${isEditing ? 'update' : 'create'} news article. Please try again.`);
-    } finally {
-      setIsLoading(false);
+      setError(err.message);
     }
   };
 
-  const handleEdit = (item) => {
-    setNewItem({
-      title: item.title || "",
-      summary: item.summary || "",
-      content: item.content || "",
-      status: item.status || "Draft"
+  // Edit news
+  const handleEdit = (news) => {
+    setEditingId(news.id);
+    setFormData({
+      title: news.title,
+      date: news.date,
+      status: news.status,
+      short_text: news.short_text,
+      full_text: news.full_text,
+      image: null
     });
-    
-    if (item.image) {
-      setImagePreview(item.image);
-    }
-    
-    setIsEditing(true);
-    setEditingId(item.id);
-    setError(null);
-    setSuccess(null);
-    
-    // Scroll to form
-    document.getElementById("news-form").scrollIntoView({ behavior: "smooth" });
+    setPreviewUrl(news.image ? news.image_url || `${API_BASE}${news.image}` : null);
   };
 
+  // Delete news
   const handleDelete = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this news article?")) return;
-    
-    setIsLoading(true);
+    if(!window.confirm("Delete this news?")) return;
     try {
-      await API.delete(`news/${id}/`);
-      setSuccess("News article deleted successfully!");
-      fetchItems();
-    } catch (err) {
-      console.error("Error deleting news article:", err);
-      setError("Failed to delete news article. Please try again.");
-    } finally {
-      setIsLoading(false);
-    }
+      const res = await fetch(`${API_BASE}/api/news/${id}/`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if(!res.ok) throw new Error("Failed to delete");
+      setNewsList(prev => prev.filter(n => n.id !== id));
+    } catch(err) { setError(err.message); }
   };
 
-  const handlePublishToggle = async (id, currentStatus) => {
-    const newStatus = currentStatus === "Published" ? "Draft" : "Published";
-    
-    setIsLoading(true);
-    try {
-      await API.patch(`news/${id}/`, { status: newStatus });
-      setSuccess(`News article ${newStatus.toLowerCase()} successfully!`);
-      fetchItems();
-    } catch (err) {
-      console.error("Error updating news status:", err);
-      setError("Failed to update news status. Please try again.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const renderFormField = (field) => {
-    switch (field.type) {
-      case "textarea":
-        return (
-          <div key={field.name} className="form-group">
-            <label htmlFor={field.name}>{field.placeholder}</label>
-            <textarea
-              id={field.name}
-              name={field.name}
-              value={newItem[field.name] || ""}
-              onChange={handleChange}
-              placeholder={field.placeholder}
-              className="form-control"
-              rows={field.name === "content" ? "8" : "4"}
-            />
-          </div>
-        );
-      
-      case "select":
-        return (
-          <div key={field.name} className="form-group">
-            <label htmlFor={field.name}>{field.placeholder}</label>
-            <select
-              id={field.name}
-              name={field.name}
-              value={newItem[field.name] || ""}
-              onChange={handleChange}
-              className="form-control"
-            >
-              <option value="">Select {field.placeholder}</option>
-              {field.options.map(option => (
-                <option key={option} value={option}>{option}</option>
-              ))}
-            </select>
-          </div>
-        );
-      
-      case "file":
-        return (
-          <div key={field.name} className="form-group">
-            <label htmlFor={field.name}>{field.placeholder}</label>
-            <input
-              type="file"
-              id={field.name}
-              name={field.name}
-              onChange={handleChange}
-              className="form-control"
-              accept="image/*"
-            />
-            {imagePreview && (
-              <div className="image-preview">
-                <img src={imagePreview} alt="Preview" />
-              </div>
-            )}
-          </div>
-        );
-      
-      default:
-        return (
-          <div key={field.name} className="form-group">
-            <label htmlFor={field.name}>{field.placeholder}</label>
-            <input
-              type={field.type}
-              id={field.name}
-              name={field.name}
-              value={newItem[field.name] || ""}
-              onChange={handleChange}
-              placeholder={field.placeholder}
-              className="form-control"
-              required={field.required}
-            />
-          </div>
-        );
-    }
-  };
-
-  const renderNewsTable = () => {
-    if (isLoading && items.length === 0) {
-      return <div className="loading">Loading news articles...</div>;
-    }
-    
-    if (items.length === 0) {
-      return (
-        <div className="empty-state">
-          <h3>No news articles found</h3>
-          <p>Create your first news article to get started</p>
-        </div>
-      );
-    }
-    
-    return (
-      <div className="table-container">
-        <table className="news-table">
-          <thead>
-            <tr>
-              <th>Image</th>
-              <th>Title</th>
-              <th>Summary</th>
-              <th>Status</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map(item => (
-              <tr key={item.id}>
-                <td className="table-image">
-                  {item.image ? (
-                    <img src={item.image} alt={item.title} />
-                  ) : (
-                    <div className="no-image">No Image</div>
-                  )}
-                </td>
-                <td className="table-title">{item.title}</td>
-                <td className="table-summary">{item.summary || "No summary available"}</td>
-                <td className="table-status">
-                  <span className={`status-badge status-${item.status?.toLowerCase()}`}>
-                    {item.status}
-                  </span>
-                </td>
-                <td className="table-actions">
-                  <div className="action-buttons">
-                    <button 
-                      className="btn-publish"
-                      onClick={() => handlePublishToggle(item.id, item.status)}
-                      disabled={isLoading}
-                    >
-                      {item.status === "Published" ? "Unpublish" : "Publish"}
-                    </button>
-                    <button 
-                      className="btn-edit"
-                      onClick={() => handleEdit(item)}
-                      disabled={isLoading}
-                    >
-                      Edit
-                    </button>
-                    <button 
-                      className="btn-delete"
-                      onClick={() => handleDelete(item.id)}
-                      disabled={isLoading}
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    );
+  // Reset form
+  const resetForm = () => {
+    setEditingId(null);
+    setFormData({
+      title: "",
+      date: "",
+      status: "draft",
+      short_text: "",
+      full_text: "",
+      image: null,
+    });
+    setPreviewUrl(null);
+    if(fileInputRef.current) fileInputRef.current.value = "";
   };
 
   return (
-    <section className="content-management">
-      <div className="content-header">
-        <h2>News Management</h2>
-        <p>Create and manage news articles for your website</p>
-      </div>
+    <div className="news-management p-6">
+      <h2>{editingId ? "Edit News" : "Create News"}</h2>
+      <form onSubmit={handleSubmit} encType="multipart/form-data" className="form">
+        <input 
+          type="text" 
+          placeholder="Title" 
+          value={formData.title} 
+          onChange={(e)=>setFormData({...formData,title:e.target.value})} 
+          required
+        />
+        <input 
+          type="date" 
+          value={formData.date} 
+          onChange={(e)=>setFormData({...formData,date:e.target.value})} 
+          required
+        />
+        <select 
+          value={formData.status} 
+          onChange={(e)=>setFormData({...formData,status:e.target.value})}
+        >
+          <option value="draft">Draft</option>
+          <option value="published">Published</option>
+        </select>
+        <textarea 
+          placeholder="Short Text" 
+          value={formData.short_text} 
+          onChange={(e)=>setFormData({...formData,short_text:e.target.value})}
+        />
+        <textarea 
+          placeholder="Full Text" 
+          value={formData.full_text} 
+          onChange={(e)=>setFormData({...formData,full_text:e.target.value})}
+        />
+        <input 
+          ref={fileInputRef} 
+          type="file" 
+          accept="image/*" 
+          onChange={(e)=>{
+            const file=e.target.files[0]; 
+            setFormData({...formData,image:file}); 
+            setPreviewUrl(file?URL.createObjectURL(file):null);
+          }}
+        />
+        {previewUrl && <img src={previewUrl} alt="preview" width="100" className="my-2"/>}
 
-      {error && (
-        <div className="alert alert-error">
-          <span>{error}</span>
-          <button onClick={() => setError(null)}>×</button>
-        </div>
-      )}
+        <button type="submit">{editingId?"Update":"Create"}</button>
+        {editingId && <button onClick={(e)=>{e.preventDefault(); resetForm();}}>Cancel</button>}
+        {error && <p className="text-red-600">{error}</p>}
+      </form>
 
-      {success && (
-        <div className="alert alert-success">
-          <span>{success}</span>
-          <button onClick={() => setSuccess(null)}>×</button>
-        </div>
-      )}
-
-      <div className="content-body">
-        <div className="form-section">
-          <h3>{isEditing ? 'Edit News Article' : 'Add New News Article'}</h3>
-          <form id="news-form" onSubmit={handleSubmit} className="item-form">
-            <div className="form-grid">
-              {NEWS_FIELDS.map(field => renderFormField(field))}
-            </div>
-            
-            <div className="form-actions">
-              <button 
-                type="submit" 
-                className="btn btn-primary"
-                disabled={isLoading}
-              >
-                {isLoading ? 'Processing...' : (isEditing ? 'Update News Article' : 'Create News Article')}
-              </button>
-              
-              {isEditing && (
-                <button 
-                  type="button" 
-                  className="btn btn-secondary"
-                  onClick={resetForm}
-                  disabled={isLoading}
-                >
-                  Cancel
-                </button>
-              )}
-            </div>
-          </form>
-        </div>
-
-        <div className="list-section">
-          <div className="section-header">
-            <h3>News Articles</h3>
-            <button 
-              className="btn-refresh"
-              onClick={fetchItems}
-              disabled={isLoading}
-            >
-              Refresh
-            </button>
-          </div>
-          
-          {renderNewsTable()}
-        </div>
-      </div>
-    </section>
+      <h3 className="mt-6">All News</h3>
+      <table className="news-table">
+        <thead>
+          <tr>
+            <th>Image</th>
+            <th>Title</th>
+            <th>Status</th>
+            <th>Date</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {newsList.map(news=>(
+            <tr key={news.id}>
+              <td>{news.image ? <img src={news.image_url || `${API_BASE}${news.image}`} width="60"/> : "No image"}</td>
+              <td>{news.title}</td>
+              <td>{news.status}</td>
+              <td>{news.date}</td>
+              <td>
+                <button onClick={()=>handleEdit(news)}>✏ Edit</button>
+                <button onClick={()=>handleDelete(news.id)}>🗑 Delete</button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
-};
-
-export default News;
+}
