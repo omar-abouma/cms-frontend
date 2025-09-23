@@ -1,374 +1,314 @@
 import React, { useState, useEffect } from "react";
-import axios from "axios";
-import "./Events.css";
+import "./Events.css"; // Import the CSS file
 
-// API configuration
-const API = axios.create({
-  baseURL: "http://127.0.0.1:8000/api/",
-});
+const API_BASE = "http://localhost:8000/api";
 
-// Field configurations for Events
-const EVENT_FIELDS = [
-  { name: "title", type: "text", placeholder: "Event Title", required: true },
-  { name: "description", type: "textarea", placeholder: "Event Description" },
-  { name: "date", type: "date", placeholder: "Event Date" },
-  { name: "time", type: "time", placeholder: "Event Time" },
-  { name: "location", type: "text", placeholder: "Location" },
-  { name: "image", type: "file", placeholder: "Event Image" },
-  { name: "category", type: "select", options: ["Conference", "Workshop", "Seminar", "Webinar", "Meeting"] },
-  { name: "attendees", type: "number", placeholder: "Expected Attendees" },
-  { name: "status", type: "select", options: ["Upcoming", "Ongoing", "Completed", "Cancelled"] }
-];
-
-const Events = () => {
-  const [items, setItems] = useState([]);
-  const [newItem, setNewItem] = useState({});
-  const [isEditing, setIsEditing] = useState(false);
+export default function CMSEvents() {
+  const [events, setEvents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [formData, setFormData] = useState({
+    title: "",
+    description: "",
+    location: "",
+    start_date: "",
+    end_date: "",
+    status: "draft",
+    image: null,
+  });
   const [editingId, setEditingId] = useState(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [success, setSuccess] = useState(null);
-  const [imagePreview, setImagePreview] = useState(null);
 
-  // Fetch events on component mount
+  const token = localStorage.getItem("access_token");
+
+  const fetchEvents = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/events/`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      setEvents(data.results || data);
+    } catch (err) {
+      console.error(err);
+      setError("Failed to fetch events.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    fetchItems();
+    fetchEvents();
   }, []);
 
-  const fetchItems = async () => {
-    setIsLoading(true);
-    try {
-      const response = await API.get("events/");
-      setItems(response.data);
-      setError(null);
-    } catch (err) {
-      console.error("Error fetching events:", err);
-      setError("Failed to fetch events. Please try again.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const handleChange = (e) => {
-    const { name, value, type, files } = e.target;
-    
-    if (type === "file") {
-      const file = files[0];
-      setNewItem({ ...newItem, [name]: file });
-      
-      // Create image preview
-      if (file) {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          setImagePreview(reader.result);
-        };
-        reader.readAsDataURL(file);
-      } else {
-        setImagePreview(null);
-      }
-    } else {
-      setNewItem({ ...newItem, [name]: value });
-    }
-  };
-
-  const resetForm = () => {
-    setNewItem({});
-    setIsEditing(false);
-    setEditingId(null);
-    setImagePreview(null);
-    setError(null);
-    setSuccess(null);
-  };
-
-  const buildFormData = (data) => {
-    const formData = new FormData();
-    
-    Object.keys(data).forEach(key => {
-      if (data[key] !== null && data[key] !== undefined) {
-        formData.append(key, data[key]);
-      }
-    });
-    
-    return formData;
-  };
-
-  const getHeaders = () => {
-    return {
-      "Content-Type": "multipart/form-data",
-    };
+    const { name, value, files } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: files ? files[0] : value,
+    }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setIsLoading(true);
-    
+
+    const body = new FormData();
+    for (let key in formData) {
+      if (formData[key] !== null) body.append(key, formData[key]);
+    }
+
+    const url = editingId ? `${API_BASE}/events/${editingId}/` : `${API_BASE}/events/`;
+    const method = editingId ? "PUT" : "POST";
+
     try {
-      const formData = buildFormData(newItem);
-      
-      if (isEditing) {
-        await API.put(`events/${editingId}/`, formData, {
-          headers: getHeaders()
-        });
-        setSuccess("Event updated successfully!");
-      } else {
-        await API.post("events/", formData, {
-          headers: getHeaders()
-        });
-        setSuccess("Event created successfully!");
-      }
-      
-      resetForm();
-      fetchItems();
+      const res = await fetch(url, {
+        method,
+        headers: { Authorization: `Bearer ${token}` },
+        body,
+      });
+      if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+
+      setFormData({
+        title: "",
+        description: "",
+        location: "",
+        start_date: "",
+        end_date: "",
+        status: "draft",
+        image: null,
+      });
+      setEditingId(null);
+      fetchEvents();
     } catch (err) {
-      console.error("Error saving event:", err);
-      setError(`Failed to ${isEditing ? 'update' : 'create'} event. Please try again.`);
-    } finally {
-      setIsLoading(false);
+      console.error(err);
+      setError("Failed to save event.");
     }
   };
 
-  const handleEdit = (item) => {
-    setNewItem({
-      title: item.title || "",
-      description: item.description || "",
-      date: item.date || "",
-      time: item.time || "",
-      location: item.location || "",
-      category: item.category || "",
-      attendees: item.attendees || "",
-      status: item.status || "Upcoming"
+  const handleEdit = (event) => {
+    setFormData({
+      title: event.title,
+      description: event.description,
+      location: event.location,
+      start_date: event.start_date ? event.start_date.slice(0, 16) : "",
+      end_date: event.end_date ? event.end_date.slice(0, 16) : "",
+      status: event.status,
+      image: null,
     });
-    
-    if (item.image) {
-      setImagePreview(item.image);
-    }
-    
-    setIsEditing(true);
-    setEditingId(item.id);
-    setError(null);
-    setSuccess(null);
-    
-    // Scroll to form
-    document.getElementById("event-form").scrollIntoView({ behavior: "smooth" });
+    setEditingId(event.id);
   };
 
   const handleDelete = async (id) => {
     if (!window.confirm("Are you sure you want to delete this event?")) return;
-    
-    setIsLoading(true);
     try {
-      await API.delete(`events/${id}/`);
-      setSuccess("Event deleted successfully!");
-      fetchItems();
+      const res = await fetch(`${API_BASE}/events/${id}/`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error("Delete failed");
+      fetchEvents();
     } catch (err) {
-      console.error("Error deleting event:", err);
-      setError("Failed to delete event. Please try again.");
-    } finally {
-      setIsLoading(false);
+      console.error(err);
+      setError("Failed to delete event.");
     }
   };
 
-  const renderFormField = (field) => {
-    switch (field.type) {
-      case "textarea":
-        return (
-          <div key={field.name} className="form-group">
-            <label htmlFor={field.name}>{field.placeholder}</label>
-            <textarea
-              id={field.name}
-              name={field.name}
-              value={newItem[field.name] || ""}
+  return (
+    <div className="cms-events">
+      <div className="cms-header">
+        <h2>Events Management</h2>
+      </div>
+
+      {loading && <div className="loading">Loading events...</div>}
+      {error && <div className="error-message">{error}</div>}
+
+      <form onSubmit={handleSubmit} className="event-form">
+        <div className="form-grid">
+          <div className="form-group">
+            <label htmlFor="title">Event Title</label>
+            <input
+              type="text"
+              id="title"
+              name="title"
+              value={formData.title}
               onChange={handleChange}
-              placeholder={field.placeholder}
-              className="form-control"
-              rows="4"
+              className="form-input"
+              placeholder="Enter event title"
+              required
             />
           </div>
-        );
-      
-      case "select":
-        return (
-          <div key={field.name} className="form-group">
-            <label htmlFor={field.name}>{field.placeholder}</label>
-            <select
-              id={field.name}
-              name={field.name}
-              value={newItem[field.name] || ""}
+
+          <div className="form-group">
+            <label htmlFor="location">Location</label>
+            <input
+              type="text"
+              id="location"
+              name="location"
+              value={formData.location}
               onChange={handleChange}
-              className="form-control"
+              className="form-input"
+              placeholder="Enter event location"
+              required
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="start_date">Start Date & Time</label>
+            <input
+              type="datetime-local"
+              id="start_date"
+              name="start_date"
+              value={formData.start_date}
+              onChange={handleChange}
+              className="form-input"
+              required
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="end_date">End Date & Time</label>
+            <input
+              type="datetime-local"
+              id="end_date"
+              name="end_date"
+              value={formData.end_date}
+              onChange={handleChange}
+              className="form-input"
+              required
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="status">Status</label>
+            <select 
+              id="status"
+              name="status" 
+              value={formData.status} 
+              onChange={handleChange}
+              className="form-select"
             >
-              <option value="">Select {field.placeholder}</option>
-              {field.options.map(option => (
-                <option key={option} value={option}>{option}</option>
-              ))}
+              <option value="draft">Draft</option>
+              <option value="published">Published</option>
             </select>
           </div>
-        );
-      
-      case "file":
-        return (
-          <div key={field.name} className="form-group">
-            <label htmlFor={field.name}>{field.placeholder}</label>
-            <input
-              type="file"
-              id={field.name}
-              name={field.name}
-              onChange={handleChange}
-              className="form-control"
-              accept="image/*"
-            />
-            {imagePreview && (
-              <div className="image-preview">
-                <img src={imagePreview} alt="Preview" />
-              </div>
-            )}
-          </div>
-        );
-      
-      default:
-        return (
-          <div key={field.name} className="form-group">
-            <label htmlFor={field.name}>{field.placeholder}</label>
-            <input
-              type={field.type}
-              id={field.name}
-              name={field.name}
-              value={newItem[field.name] || ""}
-              onChange={handleChange}
-              placeholder={field.placeholder}
-              className="form-control"
-              required={field.required}
-            />
-          </div>
-        );
-    }
-  };
 
-  const renderEventsGrid = () => {
-    if (isLoading && items.length === 0) {
-      return <div className="loading">Loading events...</div>;
-    }
-    
-    if (items.length === 0) {
-      return (
-        <div className="empty-state">
-          <h3>No events found</h3>
-          <p>Create your first event to get started</p>
-        </div>
-      );
-    }
-    
-    return (
-      <div className="items-grid">
-        {items.map(item => (
-          <div key={item.id} className="item-card">
-            <div className="item-image">
-              {item.image ? (
-                <img src={item.image} alt={item.title} />
-              ) : (
-                <div className="no-image">No Image</div>
-              )}
+          <div className="form-group">
+            <label htmlFor="image">Event Image</label>
+            <div className="file-input-wrapper">
+              <button type="button" className="file-input-button">
+                Choose Image
+              </button>
+              <input 
+                type="file" 
+                id="image"
+                name="image" 
+                onChange={handleChange}
+                accept="image/*"
+              />
             </div>
-            <div className="item-details">
-              <h3 className="item-title">{item.title}</h3>
-              <p className="item-date">{item.date} {item.time && `at ${item.time}`}</p>
-              <p className="item-location">{item.location}</p>
-              <div className="item-meta">
-                <span className={`status-badge status-${item.status?.toLowerCase()}`}>
-                  {item.status}
-                </span>
-                <span className="category-badge">{item.category}</span>
+          </div>
+
+          <div className="form-group full-width">
+            <label htmlFor="description">Description</label>
+            <textarea
+              id="description"
+              name="description"
+              value={formData.description}
+              onChange={handleChange}
+              className="form-textarea"
+              placeholder="Enter event description"
+              required
+            ></textarea>
+          </div>
+        </div>
+
+        {editingId && events.find((e) => e.id === editingId)?.image && !formData.image && (
+          <div className="image-preview">
+            <p>Current Image:</p>
+            <img
+              src={`http://localhost:8000${events.find((e) => e.id === editingId).image}`}
+              alt="Current event"
+              width="200"
+            />
+          </div>
+        )}
+
+        <div className="form-actions">
+          {editingId && (
+            <button 
+              type="button" 
+              className="btn btn-secondary"
+              onClick={() => {
+                setFormData({
+                  title: "",
+                  description: "",
+                  location: "",
+                  start_date: "",
+                  end_date: "",
+                  status: "draft",
+                  image: null,
+                });
+                setEditingId(null);
+              }}
+            >
+              Cancel Edit
+            </button>
+          )}
+          <button type="submit" className="btn btn-primary">
+            {editingId ? "Update Event" : "Create Event"}
+          </button>
+        </div>
+      </form>
+
+      <hr className="section-divider" />
+
+      <div className="events-section">
+        <h3>Existing Events ({events.length})</h3>
+        <ul className="events-list">
+          {events.map((event) => (
+            <li key={event.id} className="event-item">
+              <div className="event-header">
+                <h4 className="event-title">{event.title}</h4>
+                <div className="event-meta">
+                  <span className={`status-badge status-${event.status}`}>
+                    {event.status}
+                  </span>
+                  <span>Start: {event.start_date ? new Date(event.start_date).toLocaleString() : "N/A"}</span>
+                </div>
               </div>
-              <div className="item-actions">
+              
+              <div className="event-details">
+                <p><strong>Location:</strong> {event.location}</p>
+                <p><strong>Description:</strong> {event.description}</p>
+              </div>
+
+              {event.image && (
+                <div className="event-image">
+                  <img
+                    src={`http://localhost:8000${event.image}`}
+                    alt={event.title}
+                    width="200"
+                  />
+                </div>
+              )}
+
+              <div className="event-actions">
                 <button 
-                  className="btn-edit"
-                  onClick={() => handleEdit(item)}
+                  onClick={() => handleEdit(event)} 
+                  className="btn btn-edit"
                 >
                   Edit
                 </button>
                 <button 
-                  className="btn-delete"
-                  onClick={() => handleDelete(item.id)}
+                  onClick={() => handleDelete(event.id)} 
+                  className="btn btn-delete"
                 >
                   Delete
                 </button>
               </div>
-            </div>
-          </div>
-        ))}
+            </li>
+          ))}
+        </ul>
       </div>
-    );
-  };
-
-  return (
-    <section className="content-management">
-      <div className="content-header">
-        <h2>Events Management</h2>
-        <p>Create and manage events for your website</p>
-      </div>
-
-      {error && (
-        <div className="alert alert-error">
-          <span>{error}</span>
-          <button onClick={() => setError(null)}>×</button>
-        </div>
-      )}
-
-      {success && (
-        <div className="alert alert-success">
-          <span>{success}</span>
-          <button onClick={() => setSuccess(null)}>×</button>
-        </div>
-      )}
-
-      <div className="content-body">
-        <div className="form-section">
-          <h3>{isEditing ? 'Edit Event' : 'Add New Event'}</h3>
-          <form id="event-form" onSubmit={handleSubmit} className="item-form">
-            <div className="form-grid">
-              {EVENT_FIELDS.map(field => renderFormField(field))}
-            </div>
-            
-            <div className="form-actions">
-              <button 
-                type="submit" 
-                className="btn btn-primary"
-                disabled={isLoading}
-              >
-                {isLoading ? 'Processing...' : (isEditing ? 'Update Event' : 'Create Event')}
-              </button>
-              
-              {isEditing && (
-                <button 
-                  type="button" 
-                  className="btn btn-secondary"
-                  onClick={resetForm}
-                  disabled={isLoading}
-                >
-                  Cancel
-                </button>
-              )}
-            </div>
-          </form>
-        </div>
-
-        <div className="list-section">
-          <div className="section-header">
-            <h3>Events List</h3>
-            <button 
-              className="btn-refresh"
-              onClick={fetchItems}
-              disabled={isLoading}
-            >
-              Refresh
-            </button>
-          </div>
-          
-          {renderEventsGrid()}
-        </div>
-      </div>
-    </section>
+    </div>
   );
-};
-
-export default Events;
+}
