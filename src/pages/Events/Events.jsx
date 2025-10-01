@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import "./Events.css"; // Import the CSS file
+import "./Events.css";
 
 const API_BASE = "http://localhost:8000/api";
 
@@ -7,6 +7,7 @@ export default function CMSEvents() {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -17,6 +18,7 @@ export default function CMSEvents() {
     image: null,
   });
   const [editingId, setEditingId] = useState(null);
+  const [imagePreview, setImagePreview] = useState(null);
 
   const token = localStorage.getItem("access_token");
 
@@ -42,18 +44,32 @@ export default function CMSEvents() {
 
   const handleChange = (e) => {
     const { name, value, files } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: files ? files[0] : value,
-    }));
+    
+    if (name === "image" && files && files[0]) {
+      const file = files[0];
+      setFormData(prev => ({
+        ...prev,
+        image: file
+      }));
+      setImagePreview(URL.createObjectURL(file));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [name]: value
+      }));
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError("");
+    setSuccess("");
 
     const body = new FormData();
     for (let key in formData) {
-      if (formData[key] !== null) body.append(key, formData[key]);
+      if (formData[key] !== null && formData[key] !== "") {
+        body.append(key, formData[key]);
+      }
     }
 
     const url = editingId ? `${API_BASE}/events/${editingId}/` : `${API_BASE}/events/`;
@@ -65,8 +81,10 @@ export default function CMSEvents() {
         headers: { Authorization: `Bearer ${token}` },
         body,
       });
+      
       if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
 
+      setSuccess(editingId ? "Event updated successfully!" : "Event created successfully!");
       setFormData({
         title: "",
         description: "",
@@ -77,6 +95,7 @@ export default function CMSEvents() {
         image: null,
       });
       setEditingId(null);
+      setImagePreview(null);
       fetchEvents();
     } catch (err) {
       console.error(err);
@@ -95,6 +114,7 @@ export default function CMSEvents() {
       image: null,
     });
     setEditingId(event.id);
+    setImagePreview(null);
   };
 
   const handleDelete = async (id) => {
@@ -105,11 +125,50 @@ export default function CMSEvents() {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error("Delete failed");
+      setSuccess("Event deleted successfully!");
       fetchEvents();
     } catch (err) {
       console.error(err);
       setError("Failed to delete event.");
     }
+  };
+
+  const cancelEdit = () => {
+    setFormData({
+      title: "",
+      description: "",
+      location: "",
+      start_date: "",
+      end_date: "",
+      status: "draft",
+      image: null,
+    });
+    setEditingId(null);
+    setImagePreview(null);
+    setError("");
+    setSuccess("");
+  };
+
+  // Function to get image URL correctly
+  const getImageUrl = (event) => {
+    if (!event.image) return null;
+    
+    // Check if image is a full URL or just a path
+    if (event.image.startsWith('http')) {
+      return event.image;
+    }
+    
+    // Check if image_url is provided by API
+    if (event.image_url) {
+      return event.image_url;
+    }
+    
+    // Construct URL from image path
+    if (event.image.startsWith('/')) {
+      return `http://localhost:8000${event.image}`;
+    }
+    
+    return `http://localhost:8000/${event.image}`;
   };
 
   return (
@@ -120,10 +179,11 @@ export default function CMSEvents() {
 
       {loading && <div className="loading">Loading events...</div>}
       {error && <div className="error-message">{error}</div>}
+      {success && <div className="success-message">{success}</div>}
 
       <form onSubmit={handleSubmit} className="event-form">
         <div className="form-grid">
-          <div className="form-group">
+          <div className="form-group full-width">
             <label htmlFor="title">Event Title</label>
             <input
               type="text"
@@ -205,6 +265,11 @@ export default function CMSEvents() {
                 accept="image/*"
               />
             </div>
+            {formData.image && (
+              <small style={{display: 'block', marginTop: '5px', color: '#27ae60'}}>
+                Selected: {formData.image.name}
+              </small>
+            )}
           </div>
 
           <div className="form-group full-width">
@@ -221,13 +286,19 @@ export default function CMSEvents() {
           </div>
         </div>
 
+        {imagePreview && (
+          <div className="image-preview">
+            <p>New Image Preview:</p>
+            <img src={imagePreview} alt="Preview" />
+          </div>
+        )}
+
         {editingId && events.find((e) => e.id === editingId)?.image && !formData.image && (
           <div className="image-preview">
             <p>Current Image:</p>
             <img
-              src={`http://localhost:8000${events.find((e) => e.id === editingId).image}`}
+              src={getImageUrl(events.find((e) => e.id === editingId))}
               alt="Current event"
-              width="200"
             />
           </div>
         )}
@@ -237,18 +308,7 @@ export default function CMSEvents() {
             <button 
               type="button" 
               className="btn btn-secondary"
-              onClick={() => {
-                setFormData({
-                  title: "",
-                  description: "",
-                  location: "",
-                  start_date: "",
-                  end_date: "",
-                  status: "draft",
-                  image: null,
-                });
-                setEditingId(null);
-              }}
+              onClick={cancelEdit}
             >
               Cancel Edit
             </button>
@@ -264,50 +324,62 @@ export default function CMSEvents() {
       <div className="events-section">
         <h3>Existing Events ({events.length})</h3>
         <ul className="events-list">
-          {events.map((event) => (
-            <li key={event.id} className="event-item">
-              <div className="event-header">
-                <h4 className="event-title">{event.title}</h4>
-                <div className="event-meta">
-                  <span className={`status-badge status-${event.status}`}>
-                    {event.status}
-                  </span>
-                  <span>Start: {event.start_date ? new Date(event.start_date).toLocaleString() : "N/A"}</span>
+          {events.map((event) => {
+            const imageUrl = getImageUrl(event);
+            return (
+              <li key={event.id} className="event-item">
+                <div className="event-header">
+                  <h4 className="event-title">{event.title}</h4>
+                  <div className="event-meta">
+                    <span className={`status-badge status-${event.status}`}>
+                      {event.status}
+                    </span>
+                    <span>Start: {event.start_date ? new Date(event.start_date).toLocaleString() : "N/A"}</span>
+                  </div>
                 </div>
-              </div>
-              
-              <div className="event-details">
-                <p><strong>Location:</strong> {event.location}</p>
-                <p><strong>Description:</strong> {event.description}</p>
-              </div>
-
-              {event.image && (
-                <div className="event-image">
-                  <img
-                    src={`http://localhost:8000${event.image}`}
-                    alt={event.title}
-                    width="200"
-                  />
+                
+                <div className="event-details">
+                  <p><strong>Location:</strong> {event.location}</p>
+                  <p><strong>Description:</strong> {event.description}</p>
+                  <p><strong>End:</strong> {event.end_date ? new Date(event.end_date).toLocaleString() : "N/A"}</p>
                 </div>
-              )}
 
-              <div className="event-actions">
-                <button 
-                  onClick={() => handleEdit(event)} 
-                  className="btn btn-edit"
-                >
-                  Edit
-                </button>
-                <button 
-                  onClick={() => handleDelete(event.id)} 
-                  className="btn btn-delete"
-                >
-                  Delete
-                </button>
-              </div>
-            </li>
-          ))}
+                {imageUrl && (
+                  <div className="event-image">
+                    <img
+                      src={imageUrl}
+                      alt={event.title}
+                      onError={(e) => {
+                        e.target.style.display = 'none';
+                      }}
+                    />
+                  </div>
+                )}
+
+                <div className="event-actions">
+                  <button 
+                    onClick={() => handleEdit(event)} 
+                    className="btn btn-edit"
+                  >
+                    Edit
+                  </button>
+                  <button 
+                    onClick={() => handleDelete(event.id)} 
+                    className="btn btn-delete"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </li>
+            );
+          })}
         </ul>
+        
+        {events.length === 0 && !loading && (
+          <div style={{textAlign: 'center', padding: '40px', color: '#7f8c8d'}}>
+            No events found. Create your first event above.
+          </div>
+        )}
       </div>
     </div>
   );

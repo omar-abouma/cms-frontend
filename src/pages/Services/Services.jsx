@@ -1,286 +1,216 @@
-// Services.jsx
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import axios from "axios";
 import "./Services.css";
 
+const BASE_URL = "http://localhost:8000/api"; // Update if different
 
-const API = axios.create({
-  baseURL: "http://127.0.0.1:8000/api/",
-});
+// Reusable Input
+const Input = ({ label, ...rest }) => (
+  <div className="form-group">
+    <label>{label}</label>
+    <input {...rest} className="form-control" />
+  </div>
+);
 
-const SERVICES_FIELDS = [
-  { name: "title", type: "text", placeholder: "Service Name", required: true },
-  { name: "description", type: "textarea", placeholder: "Service Description" },
-  { name: "category", type: "select", options: ["Consulting", "Development", "Training", "Support", "Maintenance"] },
-  { name: "price", type: "number", placeholder: "Price" },
-  { name: "status", type: "select", options: ["Active", "Inactive"] }
-];
+// Infrastructure Form
+const InfrastructureForm = ({ onSubmit, formData, setFormData, isEditing, cancelEdit }) => (
+  <form onSubmit={onSubmit}>
+    <Input
+      label="Title"
+      type="text"
+      value={formData.title || ""}
+      onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+    />
+    <Input
+      label="Description"
+      type="text"
+      value={formData.desc || ""}
+      onChange={(e) => setFormData({ ...formData, desc: e.target.value })}
+    />
+    <Input
+      label="Link"
+      type="text"
+      value={formData.link || ""}
+      onChange={(e) => setFormData({ ...formData, link: e.target.value })}
+    />
+    <Input
+      label="Image"
+      type="file"
+      onChange={(e) => setFormData({ ...formData, image: e.target.files[0] })}
+    />
+    <button type="submit" className="btn btn-primary">{isEditing ? "Update" : "Create"}</button>
+    {isEditing && <button type="button" onClick={cancelEdit} className="btn btn-secondary">Cancel</button>}
+  </form>
+);
 
-const Services = () => {
-  const [items, setItems] = useState([]);
-  const [newItem, setNewItem] = useState({});
-  const [isEditing, setIsEditing] = useState(false);
+// WhyChoose Form
+const WhyChooseForm = ({ onSubmit, formData, setFormData, isEditing, cancelEdit }) => (
+  <form onSubmit={onSubmit}>
+    <Input
+      label="Icon (emoji)"
+      type="text"
+      value={formData.icon || ""}
+      onChange={(e) => setFormData({ ...formData, icon: e.target.value })}
+    />
+    <Input
+      label="Title"
+      type="text"
+      value={formData.title || ""}
+      onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+    />
+    <Input
+      label="Description"
+      type="text"
+      value={formData.desc || ""}
+      onChange={(e) => setFormData({ ...formData, desc: e.target.value })}
+    />
+    <button type="submit" className="btn btn-primary">{isEditing ? "Update" : "Create"}</button>
+    {isEditing && <button type="button" onClick={cancelEdit} className="btn btn-secondary">Cancel</button>}
+  </form>
+);
+
+export default function ServicesCMS() {
+  const [infraItems, setInfraItems] = useState([]);
+  const [whyItems, setWhyItems] = useState([]);
+
+  const [selectedTab, setSelectedTab] = useState("infrastructure");
+
+  const [formData, setFormData] = useState({});
   const [editingId, setEditingId] = useState(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [success, setSuccess] = useState(null);
 
-  useEffect(() => {
-    fetchItems();
-  }, []);
-
-  const fetchItems = () => {
-    setIsLoading(true);
-    API.get("services/")
-      .then((res) => {
-        setItems(res.data);
-        setIsLoading(false);
-      })
-      .catch((err) => {
-        setError("Failed to fetch services");
-        setIsLoading(false);
-      });
-  };
-
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setNewItem({ ...newItem, [name]: value });
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    setIsLoading(true);
-    
-    const request = isEditing 
-      ? API.put(`services/${editingId}/`, newItem)
-      : API.post("services/", newItem);
-    
-    request
-      .then((res) => {
-        setSuccess(`Service ${isEditing ? 'updated' : 'created'} successfully!`);
-        resetForm();
-        fetchItems();
-      })
-      .catch((err) => {
-        setError(`Failed to ${isEditing ? 'update' : 'create'} service. Please try again.`);
-      })
-      .finally(() => {
-        setIsLoading(false);
-      });
-  };
-
-  const resetForm = () => {
-    setNewItem({});
-    setIsEditing(false);
-    setEditingId(null);
-    setError(null);
-    setSuccess(null);
-  };
-
-  const handleEdit = (item) => {
-    setNewItem({
-      title: item.title || "",
-      description: item.description || "",
-      category: item.category || "",
-      price: item.price || "",
-      status: item.status || "Active"
-    });
-    
-    setIsEditing(true);
-    setEditingId(item.id);
-    setError(null);
-    setSuccess(null);
-  };
-
-  const handleDelete = (id) => {
-    if (!window.confirm("Are you sure you want to delete this service?")) return;
-    
-    setIsLoading(true);
-    API.delete(`services/${id}/`)
-      .then((res) => {
-        setSuccess("Service deleted successfully!");
-        fetchItems();
-      })
-      .catch((err) => {
-        setError("Failed to delete service. Please try again.");
-      })
-      .finally(() => {
-        setIsLoading(false);
-      });
-  };
-
-  const formatPrice = (price) => {
-    if (!price) return "Free";
-    return `$${parseFloat(price).toFixed(2)}`;
-  };
-
-  const renderFormField = (field) => {
-    switch (field.type) {
-      case "textarea":
-        return (
-          <div key={field.name} className="service-form-group">
-            <label htmlFor={field.name}>{field.placeholder}</label>
-            <textarea
-              id={field.name}
-              name={field.name}
-              value={newItem[field.name] || ""}
-              onChange={handleChange}
-              placeholder={field.placeholder}
-              className="service-form-control service-form-textarea"
-              rows="4"
-            />
-          </div>
-        );
-      
-      case "select":
-        return (
-          <div key={field.name} className="service-form-group">
-            <label htmlFor={field.name}>{field.placeholder}</label>
-            <select
-              id={field.name}
-              name={field.name}
-              value={newItem[field.name] || ""}
-              onChange={handleChange}
-              className="service-form-control service-form-select"
-            >
-              <option value="">Select {field.placeholder}</option>
-              {field.options.map(option => (
-                <option key={option} value={option}>{option}</option>
-              ))}
-            </select>
-          </div>
-        );
-      
-      default:
-        return (
-          <div key={field.name} className="service-form-group">
-            <label htmlFor={field.name}>{field.placeholder}</label>
-            <input
-              type={field.type}
-              id={field.name}
-              name={field.name}
-              value={newItem[field.name] || ""}
-              onChange={handleChange}
-              placeholder={field.placeholder}
-              className="service-form-control"
-              required={field.required}
-              min={field.type === "number" ? "0" : undefined}
-              step={field.type === "number" ? "0.01" : undefined}
-            />
-          </div>
-        );
+  // Fetch Data
+  const fetchInfrastructure = async () => {
+    try {
+      const res = await axios.get(`${BASE_URL}/admin-infrastructure/`);
+      setInfraItems(res.data);
+    } catch (err) {
+      console.error("Infra Fetch Error:", err);
     }
   };
 
+  const fetchWhyChoose = async () => {
+    try {
+      const res = await axios.get(`${BASE_URL}/admin-whychoose/`);
+      setWhyItems(res.data);
+    } catch (err) {
+      console.error("WhyChoose Fetch Error:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchInfrastructure();
+    fetchWhyChoose();
+  }, []);
+
+  // Create or Update
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    const isInfra = selectedTab === "infrastructure";
+
+    const endpoint = isInfra ? "admin-infrastructure" : "admin-whychoose";
+    const data = new FormData();
+
+    Object.entries(formData).forEach(([key, value]) => data.append(key, value));
+
+    try {
+      let res;
+      if (editingId) {
+        res = await axios.put(`${BASE_URL}/${endpoint}/${editingId}/`, data, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+      } else {
+        res = await axios.post(`${BASE_URL}/${endpoint}/`, data, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+      }
+
+      setFormData({});
+      setEditingId(null);
+      isInfra ? fetchInfrastructure() : fetchWhyChoose();
+    } catch (err) {
+      console.error("Save Error:", err.response?.data || err.message);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    const isInfra = selectedTab === "infrastructure";
+    const endpoint = isInfra ? "admin-infrastructure" : "admin-whychoose";
+    if (!window.confirm("Are you sure you want to delete this item?")) return;
+
+    try {
+      await axios.delete(`${BASE_URL}/${endpoint}/${id}/`);
+      isInfra ? fetchInfrastructure() : fetchWhyChoose();
+    } catch (err) {
+      console.error("Delete Error:", err);
+    }
+  };
+
+  const handleEdit = (item) => {
+    setFormData(item);
+    setEditingId(item.id);
+  };
+
+  const cancelEdit = () => {
+    setFormData({});
+    setEditingId(null);
+  };
+
   return (
-    <section className="service-management">
-      {error && (
-        <div className="service-alert service-alert-error">
-          <span>{error}</span>
-          <button onClick={() => setError(null)}>×</button>
-        </div>
-      )}
+    <div className="services-cms-container">
+      <h2>Services CMS Management</h2>
 
-      {success && (
-        <div className="service-alert service-alert-success">
-          <span>{success}</span>
-          <button onClick={() => setSuccess(null)}>×</button>
-        </div>
-      )}
-
-      <div className="service-form">
-        <h3>{isEditing ? "Edit" : "Add New"} Service</h3>
-        <form onSubmit={handleSubmit} className="service-form-grid">
-          {SERVICES_FIELDS.map(field => renderFormField(field))}
-          
-          <div className="service-form-actions">
-            <button 
-              type="submit" 
-              className="service-btn service-btn-primary"
-              disabled={isLoading}
-            >
-              {isLoading ? 'Processing...' : (isEditing ? 'Update Service' : 'Create Service')}
-            </button>
-            
-            {isEditing && (
-              <button 
-                type="button" 
-                className="service-btn service-btn-secondary"
-                onClick={resetForm}
-                disabled={isLoading}
-              >
-                Cancel
-              </button>
-            )}
-          </div>
-        </form>
+      <div className="tab-buttons">
+        <button
+          className={selectedTab === "infrastructure" ? "active" : ""}
+          onClick={() => { setSelectedTab("infrastructure"); cancelEdit(); }}
+        >
+          Service Infrastructure
+        </button>
+        <button
+          className={selectedTab === "whychoose" ? "active" : ""}
+          onClick={() => { setSelectedTab("whychoose"); cancelEdit(); }}
+        >
+          Why Choose Us
+        </button>
       </div>
 
-      <div className="service-list">
-        <div className="service-section-header">
-          <h3>Services List</h3>
-          <button 
-            className="service-btn-refresh"
-            onClick={fetchItems}
-            disabled={isLoading}
-          >
-            Refresh
-          </button>
-        </div>
-        
-        {isLoading && items.length === 0 ? (
-          <div className="service-loading">Loading services...</div>
-        ) : items.length === 0 ? (
-          <div className="service-empty-state">
-            <h4>No services found</h4>
-            <p>Create your first service to get started</p>
-          </div>
+      <div className="form-section">
+        {selectedTab === "infrastructure" ? (
+          <InfrastructureForm
+            onSubmit={handleSubmit}
+            formData={formData}
+            setFormData={setFormData}
+            isEditing={!!editingId}
+            cancelEdit={cancelEdit}
+          />
         ) : (
-          <div className="service-items-grid">
-            {items.map(item => (
-              <div key={item.id} className="service-item-card">
-                <div className="service-item-header">
-                  <h4 className="service-item-title">{item.title}</h4>
-                  <span className={`service-status-badge service-status-${item.status?.toLowerCase()}`}>
-                    {item.status}
-                  </span>
-                </div>
-                
-                <div className="service-item-category">
-                  <span className="service-category-badge">{item.category}</span>
-                </div>
-                
-                <div className="service-item-price">
-                  {formatPrice(item.price)}
-                </div>
-                
-                <div className="service-item-description">
-                  <p>{item.description}</p>
-                </div>
-                
-                <div className="service-item-actions">
-                  <button 
-                    className="service-btn-edit"
-                    onClick={() => handleEdit(item)}
-                    disabled={isLoading}
-                  >
-                    Edit
-                  </button>
-                  <button 
-                    className="service-btn-delete"
-                    onClick={() => handleDelete(item.id)}
-                    disabled={isLoading}
-                  >
-                    Delete
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
+          <WhyChooseForm
+            onSubmit={handleSubmit}
+            formData={formData}
+            setFormData={setFormData}
+            isEditing={!!editingId}
+            cancelEdit={cancelEdit}
+          />
         )}
       </div>
-    </section>
-  );
-};
 
-export default Services;
+      <div className="items-list">
+        {(selectedTab === "infrastructure" ? infraItems : whyItems).map((item) => (
+          <div className="card" key={item.id}>
+            {item.image_url && <img src={item.image_url} alt={item.title} />}
+            <div className="card-body">
+              <h4>{item.title}</h4>
+              <p>{item.desc}</p>
+              {item.icon && <span>{item.icon}</span>}
+              {item.link && <a href={item.link}>{item.link}</a>}
+              <div className="actions">
+                <button onClick={() => handleEdit(item)}>Edit</button>
+                <button onClick={() => handleDelete(item.id)}>Delete</button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}

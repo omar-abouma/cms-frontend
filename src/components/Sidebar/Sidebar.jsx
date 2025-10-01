@@ -1,3 +1,4 @@
+// src/components/Sidebar.jsx
 import React, { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
@@ -41,9 +42,8 @@ const Sidebar = () => {
 
   return (
     <nav className="sidebar">
-      
-
       <ul className="sidebar-menu">
+        {/* Dashboard */}
         <li className={`menu-item ${location.pathname === "/dashboard" ? "active" : ""}`}>
           <Link to="/dashboard" className="menu-content">
             <FiHome className="menu-icon" />
@@ -81,6 +81,7 @@ const Sidebar = () => {
           )}
         </li>
 
+        {/* Researches */}
         <li className={`menu-item ${location.pathname === "/researches" ? "active" : ""}`}>
           <Link to="/researches" className="menu-content">
             <FiFileText className="menu-icon" />
@@ -88,6 +89,7 @@ const Sidebar = () => {
           </Link>
         </li>
 
+        {/* Projects */}
         <li className={`menu-item ${location.pathname === "/projects" ? "active" : ""}`}>
           <Link to="/projects" className="menu-content">
             <FiFolder className="menu-icon" />
@@ -95,6 +97,7 @@ const Sidebar = () => {
           </Link>
         </li>
 
+        {/* Publications */}
         <li className={`menu-item ${location.pathname === "/publications" ? "active" : ""}`}>
           <Link to="/publications" className="menu-content">
             <FiBookOpen className="menu-icon" />
@@ -102,6 +105,7 @@ const Sidebar = () => {
           </Link>
         </li>
 
+        {/* Services */}
         <li className={`menu-item ${location.pathname === "/services" ? "active" : ""}`}>
           <Link to="/services" className="menu-content">
             <FiServer className="menu-icon" />
@@ -109,10 +113,11 @@ const Sidebar = () => {
           </Link>
         </li>
 
-        <li className={`menu-item ${location.pathname === "/settings" ? "active" : ""}`}>
-          <Link to="/settings" className="menu-content">
+        {/* ✅ Staff Management (was Organization Staff before) */}
+        <li className={`menu-item ${location.pathname === "/staffmanagement" ? "active" : ""}`}>
+          <Link to="/staffmanagement" className="menu-content">
             <FiSettings className="menu-icon" />
-            <span>Settings</span>
+            <span>Staff Management</span>
           </Link>
         </li>
       </ul>

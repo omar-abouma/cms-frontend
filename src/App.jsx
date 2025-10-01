@@ -11,7 +11,8 @@ import Researches from './pages/Researches/Researches';
 import Projects from './pages/Projects/Projects';
 import Publications from './pages/Publications/Publications';
 import Services from './pages/Services/Services';
-import Settings from './pages/Settings/Settings';
+import StaffManagement from './pages/StaffManagement/StaffManagement';
+
 
 import Layout from './components/Layout';
 import './App.css';
@@ -270,11 +271,11 @@ function App() {
           />
 
           <Route 
-            path="/settings" 
+            path="/staffmanagement" 
             element={
               isAuthenticated ? (
                 <Layout onLogout={handleLogout} userData={userData}>
-                  <Settings />
+                  <StaffManagement />
                 </Layout>
               ) : (
                 <Navigate to="/login" replace />
