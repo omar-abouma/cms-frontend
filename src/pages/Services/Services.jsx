@@ -1,216 +1,177 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
-import "./Services.css";
+import "./ServicesManagement.css";
 
-const BASE_URL = "http://localhost:8000/api"; // Update if different
+// ✅ Modal form component for Add/Edit
+function ServiceModal({ service, onClose, onSave }) {
+  const [formData, setFormData] = useState({
+    title: service?.title || "",
+    description: service?.description || "",
+    image: null
+  });
+  const [loading, setLoading] = useState(false);
 
-// Reusable Input
-const Input = ({ label, ...rest }) => (
-  <div className="form-group">
-    <label>{label}</label>
-    <input {...rest} className="form-control" />
-  </div>
-);
+  const API_URL = "http://127.0.0.1:8000/api/services/";
 
-// Infrastructure Form
-const InfrastructureForm = ({ onSubmit, formData, setFormData, isEditing, cancelEdit }) => (
-  <form onSubmit={onSubmit}>
-    <Input
-      label="Title"
-      type="text"
-      value={formData.title || ""}
-      onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-    />
-    <Input
-      label="Description"
-      type="text"
-      value={formData.desc || ""}
-      onChange={(e) => setFormData({ ...formData, desc: e.target.value })}
-    />
-    <Input
-      label="Link"
-      type="text"
-      value={formData.link || ""}
-      onChange={(e) => setFormData({ ...formData, link: e.target.value })}
-    />
-    <Input
-      label="Image"
-      type="file"
-      onChange={(e) => setFormData({ ...formData, image: e.target.files[0] })}
-    />
-    <button type="submit" className="btn btn-primary">{isEditing ? "Update" : "Create"}</button>
-    {isEditing && <button type="button" onClick={cancelEdit} className="btn btn-secondary">Cancel</button>}
-  </form>
-);
-
-// WhyChoose Form
-const WhyChooseForm = ({ onSubmit, formData, setFormData, isEditing, cancelEdit }) => (
-  <form onSubmit={onSubmit}>
-    <Input
-      label="Icon (emoji)"
-      type="text"
-      value={formData.icon || ""}
-      onChange={(e) => setFormData({ ...formData, icon: e.target.value })}
-    />
-    <Input
-      label="Title"
-      type="text"
-      value={formData.title || ""}
-      onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-    />
-    <Input
-      label="Description"
-      type="text"
-      value={formData.desc || ""}
-      onChange={(e) => setFormData({ ...formData, desc: e.target.value })}
-    />
-    <button type="submit" className="btn btn-primary">{isEditing ? "Update" : "Create"}</button>
-    {isEditing && <button type="button" onClick={cancelEdit} className="btn btn-secondary">Cancel</button>}
-  </form>
-);
-
-export default function ServicesCMS() {
-  const [infraItems, setInfraItems] = useState([]);
-  const [whyItems, setWhyItems] = useState([]);
-
-  const [selectedTab, setSelectedTab] = useState("infrastructure");
-
-  const [formData, setFormData] = useState({});
-  const [editingId, setEditingId] = useState(null);
-
-  // Fetch Data
-  const fetchInfrastructure = async () => {
-    try {
-      const res = await axios.get(`${BASE_URL}/admin-infrastructure/`);
-      setInfraItems(res.data);
-    } catch (err) {
-      console.error("Infra Fetch Error:", err);
-    }
+  const handleChange = (e) => {
+    const { name, value, files } = e.target;
+    if (name === "image") setFormData({ ...formData, image: files[0] });
+    else setFormData({ ...formData, [name]: value });
   };
 
-  const fetchWhyChoose = async () => {
-    try {
-      const res = await axios.get(`${BASE_URL}/admin-whychoose/`);
-      setWhyItems(res.data);
-    } catch (err) {
-      console.error("WhyChoose Fetch Error:", err);
-    }
-  };
-
-  useEffect(() => {
-    fetchInfrastructure();
-    fetchWhyChoose();
-  }, []);
-
-  // Create or Update
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const isInfra = selectedTab === "infrastructure";
-
-    const endpoint = isInfra ? "admin-infrastructure" : "admin-whychoose";
-    const data = new FormData();
-
-    Object.entries(formData).forEach(([key, value]) => data.append(key, value));
-
+    setLoading(true);
     try {
-      let res;
-      if (editingId) {
-        res = await axios.put(`${BASE_URL}/${endpoint}/${editingId}/`, data, {
+      const data = new FormData();
+      data.append("title", formData.title);
+      data.append("description", formData.description);
+      if (formData.image) data.append("image", formData.image);
+
+      if (service?.id) {
+        await axios.put(`${API_URL}${service.id}/`, data, {
           headers: { "Content-Type": "multipart/form-data" },
         });
       } else {
-        res = await axios.post(`${BASE_URL}/${endpoint}/`, data, {
+        await axios.post(API_URL, data, {
           headers: { "Content-Type": "multipart/form-data" },
         });
       }
 
-      setFormData({});
-      setEditingId(null);
-      isInfra ? fetchInfrastructure() : fetchWhyChoose();
+      onSave();
+      onClose();
     } catch (err) {
-      console.error("Save Error:", err.response?.data || err.message);
+      console.error("Error saving service:", err);
+    } finally {
+      setLoading(false);
     }
-  };
-
-  const handleDelete = async (id) => {
-    const isInfra = selectedTab === "infrastructure";
-    const endpoint = isInfra ? "admin-infrastructure" : "admin-whychoose";
-    if (!window.confirm("Are you sure you want to delete this item?")) return;
-
-    try {
-      await axios.delete(`${BASE_URL}/${endpoint}/${id}/`);
-      isInfra ? fetchInfrastructure() : fetchWhyChoose();
-    } catch (err) {
-      console.error("Delete Error:", err);
-    }
-  };
-
-  const handleEdit = (item) => {
-    setFormData(item);
-    setEditingId(item.id);
-  };
-
-  const cancelEdit = () => {
-    setFormData({});
-    setEditingId(null);
   };
 
   return (
-    <div className="services-cms-container">
-      <h2>Services CMS Management</h2>
-
-      <div className="tab-buttons">
-        <button
-          className={selectedTab === "infrastructure" ? "active" : ""}
-          onClick={() => { setSelectedTab("infrastructure"); cancelEdit(); }}
-        >
-          Service Infrastructure
-        </button>
-        <button
-          className={selectedTab === "whychoose" ? "active" : ""}
-          onClick={() => { setSelectedTab("whychoose"); cancelEdit(); }}
-        >
-          Why Choose Us
-        </button>
-      </div>
-
-      <div className="form-section">
-        {selectedTab === "infrastructure" ? (
-          <InfrastructureForm
-            onSubmit={handleSubmit}
-            formData={formData}
-            setFormData={setFormData}
-            isEditing={!!editingId}
-            cancelEdit={cancelEdit}
+    <div className="modal-backdrop">
+      <div className="modal">
+        <h2>{service?.id ? "Edit Service" : "Add New Service"}</h2>
+        <form onSubmit={handleSubmit}>
+          <input
+            type="text"
+            name="title"
+            placeholder="Service Title"
+            value={formData.title}
+            onChange={handleChange}
+            required
           />
-        ) : (
-          <WhyChooseForm
-            onSubmit={handleSubmit}
-            formData={formData}
-            setFormData={setFormData}
-            isEditing={!!editingId}
-            cancelEdit={cancelEdit}
-          />
-        )}
-      </div>
-
-      <div className="items-list">
-        {(selectedTab === "infrastructure" ? infraItems : whyItems).map((item) => (
-          <div className="card" key={item.id}>
-            {item.image_url && <img src={item.image_url} alt={item.title} />}
-            <div className="card-body">
-              <h4>{item.title}</h4>
-              <p>{item.desc}</p>
-              {item.icon && <span>{item.icon}</span>}
-              {item.link && <a href={item.link}>{item.link}</a>}
-              <div className="actions">
-                <button onClick={() => handleEdit(item)}>Edit</button>
-                <button onClick={() => handleDelete(item.id)}>Delete</button>
-              </div>
-            </div>
+          <textarea
+            name="description"
+            placeholder="Service Description"
+            value={formData.description}
+            onChange={handleChange}
+            required
+          ></textarea>
+          <input type="file" name="image" accept="image/*" onChange={handleChange} />
+          <div className="modal-actions">
+            <button type="submit" disabled={loading}>
+              {loading ? "Saving..." : "Save"}
+            </button>
+            <button type="button" onClick={onClose}>Cancel</button>
           </div>
-        ))}
+        </form>
       </div>
+    </div>
+  );
+}
+
+// ✅ Main Services Management Component
+export default function ServicesManagement() {
+  const [services, setServices] = useState([]);
+  const [editingService, setEditingService] = useState(null);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const API_URL = "http://127.0.0.1:8000/api/services/";
+
+  const fetchServices = async () => {
+    try {
+      const res = await axios.get(API_URL);
+      setServices(res.data.results ? res.data.results : res.data);
+    } catch (err) {
+      console.error("Error fetching services:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchServices();
+  }, []);
+
+  const handleDelete = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this service?")) return;
+    try {
+      await axios.delete(`${API_URL}${id}/`);
+      fetchServices();
+    } catch (err) {
+      console.error("Error deleting service:", err);
+    }
+  };
+
+  const filteredServices = services.filter(service =>
+    service.title.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  return (
+    <div className="services-admin-container">
+      <h1>Services Management</h1>
+
+      <div className="top-bar">
+        <button className="add-btn" onClick={() => setEditingService({})}>
+          Add New Service
+        </button>
+        <input
+          type="text"
+          placeholder="Search by title..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+        />
+      </div>
+
+      <table className="services-table">
+        <thead>
+          <tr>
+            <th>Title</th>
+            <th>Description</th>
+            <th>Image</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {filteredServices.length > 0 ? (
+            filteredServices.map(service => (
+              <tr key={service.id}>
+                <td>{service.title}</td>
+                <td>{service.description}</td>
+                <td>
+                  {service.image && (
+                    <img src={service.image} alt={service.title} width="80" />
+                  )}
+                </td>
+                <td>
+                  <button onClick={() => setEditingService(service)}>Edit</button>
+                  <button onClick={() => handleDelete(service.id)}>Delete</button>
+                </td>
+              </tr>
+            ))
+          ) : (
+            <tr>
+              <td colSpan="4">No services found.</td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+
+      {editingService && (
+        <ServiceModal
+          service={editingService}
+          onClose={() => setEditingService(null)}
+          onSave={fetchServices}
+        />
+      )}
     </div>
   );
 }

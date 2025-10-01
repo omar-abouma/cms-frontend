@@ -1,0 +1,140 @@
+/* ServicesManagement.css */
+
+/* Container */
+.services-admin-container {
+  max-width: 1200px;
+  margin: 2rem auto;
+  padding: 0 1rem;
+  font-family: Arial, sans-serif;
+}
+
+/* Heading */
+.services-admin-container h1 {
+  text-align: center;
+  margin-bottom: 2rem;
+  color: #2c3e50;
+}
+
+/* Form */
+.service-form {
+  background: #f9f9f9;
+  padding: 1.5rem;
+  border-radius: 10px;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+  margin-bottom: 2rem;
+}
+
+.service-form h2 {
+  margin-bottom: 1rem;
+  color: #34495e;
+}
+
+.service-form input[type="text"],
+.service-form textarea,
+.service-form input[type="file"] {
+  width: 100%;
+  padding: 0.7rem;
+  margin-bottom: 1rem;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  font-size: 1rem;
+}
+
+.service-form textarea {
+  min-height: 100px;
+  resize: vertical;
+}
+
+.service-form button {
+  padding: 0.7rem 1.5rem;
+  background-color: #2980b9;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  margin-right: 0.5rem;
+  transition: background-color 0.3s ease;
+}
+
+.service-form button:hover {
+  background-color: #1c5980;
+}
+
+/* Services List */
+.services-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+}
+
+.service-card {
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.service-card img {
+  width: 100%;
+  height: 180px;
+  object-fit: cover;
+}
+
+.service-info {
+  padding: 1rem;
+  flex: 1;
+}
+
+.service-info h3 {
+  margin-top: 0;
+  color: #2c3e50;
+}
+
+.service-info p {
+  font-size: 0.95rem;
+  color: #555;
+  margin-bottom: 1rem;
+}
+
+/* Actions */
+.service-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.service-actions button {
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: 0.3s;
+}
+
+.service-actions button:first-child {
+  background-color: #27ae60;
+  color: #fff;
+}
+
+.service-actions button:first-child:hover {
+  background-color: #1e8449;
+}
+
+.service-actions button:last-child {
+  background-color: #c0392b;
+  color: #fff;
+}
+
+.service-actions button:last-child:hover {
+  background-color: #922b21;
+}
+
+/* Responsive */
+@media screen and (max-width: 768px) {
+  .services-list {
+    grid-template-columns: 1fr;
+  }
+}

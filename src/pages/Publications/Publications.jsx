@@ -1,275 +1,246 @@
-// Publications.jsx
-import React, { useState, useEffect } from "react";
-import axios from "axios";
-import "./Publications.css";
+import React, { useEffect, useState } from 'react';
+import './Publications.css';
 
-const API = axios.create({
-  baseURL: "http://127.0.0.1:8000/api/",
-});
+const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
 
-const PUBLICATIONS_FIELDS = [
-  { name: "title", type: "text", placeholder: "Publication Title", required: true },
-  { name: "author", type: "text", placeholder: "Author" },
-  { name: "abstract", type: "textarea", placeholder: "Abstract" },
-  { name: "file", type: "file", placeholder: "PDF File" },
-  { name: "status", type: "select", options: ["Draft", "Published", "Under Review"] }
-];
+function authHeaders() {
+  const token = localStorage.getItem("access_token");
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
 
-const Publications = () => {
-  const [items, setItems] = useState([]);
-  const [newItem, setNewItem] = useState({});
-  const [isEditing, setIsEditing] = useState(false);
-  const [editingId, setEditingId] = useState(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [success, setSuccess] = useState(null);
-  const [filePreview, setFilePreview] = useState(null);
+export default function PublicationManagement() {
+  const [publications, setPublications] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState(null);
+  const [form, setForm] = useState({
+    author: '',
+    title: '',
+    pub_type: 'Journal Article',
+    date_published: '',
+    abstract: '',
+    file: null,
+  });
 
   useEffect(() => {
-    fetchItems();
+    fetchPublications();
   }, []);
 
-  const fetchItems = () => {
-    setIsLoading(true);
-    API.get("publications/")
-      .then((res) => {
-        setItems(res.data);
-        setIsLoading(false);
-      })
-      .catch((err) => {
-        setError("Failed to fetch publications");
-        setIsLoading(false);
-      });
-  };
-
-  const handleChange = (e) => {
-    const { name, value, type, files } = e.target;
-    
-    if (type === "file") {
-      const file = files[0];
-      setNewItem({ ...newItem, [name]: file });
-      
-      // Show file info preview
-      if (file) {
-        setFilePreview({
-          name: file.name,
-          size: (file.size / 1024).toFixed(2) + ' KB',
-          type: file.type
-        });
-      } else {
-        setFilePreview(null);
-      }
-    } else {
-      setNewItem({ ...newItem, [name]: value });
-    }
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    setIsLoading(true);
-    
-    const formData = new FormData();
-    Object.keys(newItem).forEach(key => {
-      if (newItem[key] !== null && newItem[key] !== undefined) {
-        formData.append(key, newItem[key]);
-      }
-    });
-    
-    const config = {
+  function fetchPublications() {
+    setLoading(true);
+    fetch(`${API_BASE}/api/publications/`, {
       headers: {
-        'Content-Type': 'multipart/form-data',
-      }
-    };
-    
-    const request = isEditing 
-      ? API.put(`publications/${editingId}/`, formData, config)
-      : API.post("publications/", formData, config);
-    
-    request
+        ...authHeaders(),
+      },
+    })
       .then((res) => {
-        setSuccess(`Publication ${isEditing ? 'updated' : 'created'} successfully!`);
-        resetForm();
-        fetchItems();
+        if (!res.ok) throw new Error("Failed to fetch publications");
+        return res.json();
+      })
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setPublications(data);
+        } else if (Array.isArray(data.results)) {
+          setPublications(data.results);
+        } else {
+          setPublications([]);
+        }
       })
       .catch((err) => {
-        setError(`Failed to ${isEditing ? 'update' : 'create'} publication. Please try again.`);
+        console.error("Fetch error:", err);
+        setPublications([]);
       })
-      .finally(() => {
-        setIsLoading(false);
-      });
-  };
+      .finally(() => setLoading(false));
+  }
 
-  const resetForm = () => {
-    setNewItem({});
-    setIsEditing(false);
-    setEditingId(null);
-    setFilePreview(null);
-    setError(null);
-    setSuccess(null);
-  };
+  function handleChange(e) {
+    const { name, value, files } = e.target;
+    if (files) {
+      setForm((prev) => ({ ...prev, [name]: files[0] }));
+      return;
+    }
+    setForm((prev) => ({ ...prev, [name]: value }));
+  }
 
-  const handleEdit = (item) => {
-    setNewItem({
-      title: item.title || "",
-      author: item.author || "",
-      abstract: item.abstract || "",
-      status: item.status || "Draft"
+  function handleEdit(pub) {
+    setEditing(pub.id);
+    setForm({
+      author: pub.author || '',
+      title: pub.title || '',
+      pub_type: pub.pub_type || 'Journal Article',
+      date_published: pub.date_published || '',
+      abstract: pub.abstract || '',
+      file: null,
     });
-    
-    if (item.file) {
-      setFilePreview({
-        name: "Current file",
-        size: "Already uploaded",
-        type: "file"
-      });
-    }
-    
-    setIsEditing(true);
-    setEditingId(item.id);
-    setError(null);
-    setSuccess(null);
-  };
+  }
 
-  const handleDelete = (id) => {
-    if (!window.confirm("Are you sure you want to delete this publication?")) return;
-    
-    setIsLoading(true);
-    API.delete(`publications/${id}/`)
-      .then((res) => {
-        setSuccess("Publication deleted successfully!");
-        fetchItems();
+  function handleCancel() {
+    setEditing(null);
+    setForm({
+      author: '',
+      title: '',
+      pub_type: 'Journal Article',
+      date_published: '',
+      abstract: '',
+      file: null,
+    });
+  }
+
+  function handleSubmit(e) {
+    e.preventDefault();
+    const formData = new FormData();
+    formData.append('author', form.author);
+    formData.append('title', form.title);
+    formData.append('pub_type', form.pub_type);
+    formData.append('date_published', form.date_published);
+    formData.append('abstract', form.abstract || '');
+    if (form.file) formData.append('file', form.file);
+
+    const method = editing ? 'PATCH' : 'POST';
+    const url = editing
+      ? `${API_BASE}/api/publications/${editing}/`
+      : `${API_BASE}/api/publications/`;
+
+    fetch(url, {
+      method,
+      headers: {
+        ...authHeaders(),
+      },
+      body: formData,
+    })
+      .then(async (res) => {
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(`Error: ${res.status} ${JSON.stringify(body)}`);
+        }
+        return res.json();
+      })
+      .then(() => {
+        fetchPublications();
+        handleCancel();
       })
       .catch((err) => {
-        setError("Failed to delete publication. Please try again.");
-      })
-      .finally(() => {
-        setIsLoading(false);
+        console.error('Submit error', err);
+        alert('Error saving publication. See console for details.');
       });
-  };
+  }
 
-  const renderFormField = (field) => {
-    switch (field.type) {
-      case "textarea":
-        return (
-          <div key={field.name} className="pub-form-group">
-            <label htmlFor={field.name}>{field.placeholder}</label>
-            <textarea
-              id={field.name}
-              name={field.name}
-              value={newItem[field.name] || ""}
-              onChange={handleChange}
-              placeholder={field.placeholder}
-              className="pub-form-control pub-form-textarea"
-              rows="4"
-            />
-          </div>
-        );
-      
-      case "select":
-        return (
-          <div key={field.name} className="pub-form-group">
-            <label htmlFor={field.name}>{field.placeholder}</label>
-            <select
-              id={field.name}
-              name={field.name}
-              value={newItem[field.name] || ""}
-              onChange={handleChange}
-              className="pub-form-control pub-form-select"
-            >
-              <option value="">Select {field.placeholder}</option>
-              {field.options.map(option => (
-                <option key={option} value={option}>{option}</option>
-              ))}
-            </select>
-          </div>
-        );
-      
-      case "file":
-        return (
-          <div key={field.name} className="pub-form-group">
-            <label htmlFor={field.name}>{field.placeholder}</label>
-            <input
-              type="file"
-              id={field.name}
-              name={field.name}
-              onChange={handleChange}
-              className="pub-form-control"
-              accept=".pdf,.doc,.docx"
-            />
-            {filePreview && (
-              <div className="pub-file-preview">
-                <div className="pub-file-info">
-                  <div className="pub-file-icon">
-                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                  </div>
-                  <div className="pub-file-details">
-                    <div className="pub-file-name">{filePreview.name}</div>
-                    <div className="pub-file-size">{filePreview.size}</div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        );
-      
-      default:
-        return (
-          <div key={field.name} className="pub-form-group">
-            <label htmlFor={field.name}>{field.placeholder}</label>
-            <input
-              type={field.type}
-              id={field.name}
-              name={field.name}
-              value={newItem[field.name] || ""}
-              onChange={handleChange}
-              placeholder={field.placeholder}
-              className="pub-form-control"
-              required={field.required}
-            />
-          </div>
-        );
-    }
-  };
+  function handleDelete(id) {
+    if (!window.confirm('Are you sure you want to delete this publication?')) return;
+    fetch(`${API_BASE}/api/publications/${id}/`, {
+      method: 'DELETE',
+      headers: {
+        ...authHeaders(),
+      },
+    })
+      .then((res) => {
+        if (res.status === 204) fetchPublications();
+        else throw new Error('Delete failed');
+      })
+      .catch((err) => {
+        console.error(err);
+        alert('Failed to delete publication');
+      });
+  }
+
+  function getTypeClass(pubType) {
+    const typeMap = {
+      'Journal Article': 'journal',
+      'Conference Paper': 'conference',
+      'Book Chapter': 'book',
+      'Report': 'report',
+      'Other': 'other'
+    };
+    return typeMap[pubType] || 'other';
+  }
 
   return (
-    <section className="pub-management">
-      {error && (
-        <div className="pub-alert pub-alert-error">
-          <span>{error}</span>
-          <button onClick={() => setError(null)}>×</button>
-        </div>
-      )}
+    <div className="publication-management">
+      <h2>Publication Management</h2>
 
-      {success && (
-        <div className="pub-alert pub-alert-success">
-          <span>{success}</span>
-          <button onClick={() => setSuccess(null)}>×</button>
-        </div>
-      )}
+      {/* FORM SECTION - TOP */}
+      <div className="form-section">
+        <h3>{editing ? 'Edit Publication' : 'Create New Publication'}</h3>
+        <form onSubmit={handleSubmit}>
+          <div className="form-grid">
+            <div className="form-group">
+              <label>Author</label>
+              <input
+                name="author"
+                value={form.author}
+                onChange={handleChange}
+                required
+                placeholder="Enter author name"
+              />
+            </div>
 
-      <div className="pub-form">
-        <h3>{isEditing ? "Edit" : "Add New"} Publication</h3>
-        <form onSubmit={handleSubmit} className="pub-form-grid">
-          {PUBLICATIONS_FIELDS.map(field => renderFormField(field))}
-          
-          <div className="pub-form-actions">
-            <button 
-              type="submit" 
-              className="pub-btn pub-btn-primary"
-              disabled={isLoading}
-            >
-              {isLoading ? 'Processing...' : (isEditing ? 'Update Publication' : 'Create Publication')}
-            </button>
-            
-            {isEditing && (
-              <button 
-                type="button" 
-                className="pub-btn pub-btn-secondary"
-                onClick={resetForm}
-                disabled={isLoading}
+            <div className="form-group">
+              <label>Title</label>
+              <input
+                name="title"
+                value={form.title}
+                onChange={handleChange}
+                required
+                placeholder="Enter publication title"
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Type</label>
+              <select
+                name="pub_type"
+                value={form.pub_type}
+                onChange={handleChange}
               >
+                <option value="Journal Article">Journal Article</option>
+                <option value="Conference Paper">Conference Paper</option>
+                <option value="Book Chapter">Book Chapter</option>
+                <option value="Report">Report</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label>Date Published</label>
+              <input
+                type="date"
+                name="date_published"
+                value={form.date_published}
+                onChange={handleChange}
+                required
+              />
+            </div>
+
+            <div className="form-group full-width">
+              <label>Abstract</label>
+              <textarea
+                name="abstract"
+                value={form.abstract}
+                onChange={handleChange}
+                placeholder="Enter publication abstract"
+                rows="4"
+              />
+            </div>
+
+            <div className="form-group full-width">
+              <label>File Upload</label>
+              <div className="file-input-group">
+                <input
+                  type="file"
+                  name="file"
+                  accept=".pdf,.doc,.docx,.pptx"
+                  onChange={handleChange}
+                />
+                <small>Supported formats: PDF, DOC, DOCX, PPTX</small>
+              </div>
+            </div>
+          </div>
+
+          <div className="form-buttons">
+            <button type="submit" className="submit-btn">
+              {editing ? 'Update Publication' : 'Create Publication'}
+            </button>
+            {editing && (
+              <button type="button" className="cancel-btn" onClick={handleCancel}>
                 Cancel
               </button>
             )}
@@ -277,60 +248,71 @@ const Publications = () => {
         </form>
       </div>
 
-      <div className="pub-list">
-        <h3>Publications List</h3>
+      {/* LIST SECTION - BOTTOM */}
+      <div className="list-section">
+        <h3>Existing Publications</h3>
         
-        {isLoading && items.length === 0 ? (
-          <div className="pub-loading">Loading publications...</div>
-        ) : items.length === 0 ? (
-          <div className="pub-empty-state">
-            <h4>No publications found</h4>
-            <p>Create your first publication to get started</p>
+        {loading ? (
+          <div className="loading-state">
+            <p>Loading publications...</p>
+          </div>
+        ) : publications.length === 0 ? (
+          <div className="empty-state">
+            <p>No publications found. Create your first publication above.</p>
           </div>
         ) : (
-          <table className="pub-table">
+          <table className="publications-table">
             <thead>
               <tr>
-                <th>Title</th>
+                <th>#</th>
                 <th>Author</th>
-                <th>Status</th>
+                <th>Title</th>
+                <th>Type</th>
+                <th>Date Published</th>
+                <th>File</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {items.map(item => (
-                <tr key={item.id}>
-                  <td>{item.title}</td>
-                  <td>{item.author}</td>
+              {publications.map((pub) => (
+                <tr key={pub.id}>
+                  <td>{pub.id}</td>
+                  <td>{pub.author}</td>
+                  <td>{pub.title}</td>
                   <td>
-                    <span className={`pub-status-badge pub-status-${item.status?.toLowerCase().replace(' ', '-')}`}>
-                      {item.status}
+                    <span className={`pub-type-badge type-${getTypeClass(pub.pub_type)}`}>
+                      {pub.pub_type}
                     </span>
                   </td>
+                  <td>{pub.date_published}</td>
                   <td>
-                    <div className="pub-action-buttons">
+                    {pub.file_url ? (
+                      <a 
+                        href={pub.file_url} 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className="file-link"
+                      >
+                        📎 View File
+                      </a>
+                    ) : (
+                      <span style={{color: '#95a5a6'}}>—</span>
+                    )}
+                  </td>
+                  <td>
+                    <div className="action-buttons">
                       <button 
-                        className="pub-btn-edit"
-                        onClick={() => handleEdit(item)}
-                        disabled={isLoading}
+                        className="edit-btn"
+                        onClick={() => handleEdit(pub)}
                       >
                         Edit
                       </button>
                       <button 
-                        className="pub-btn-delete"
-                        onClick={() => handleDelete(item.id)}
-                        disabled={isLoading}
+                        className="delete-btn"
+                        onClick={() => handleDelete(pub.id)}
                       >
                         Delete
                       </button>
-                      {item.file && (
-                        <button 
-                          className="pub-btn-download"
-                          onClick={() => window.open(item.file, '_blank')}
-                        >
-                          Download
-                        </button>
-                      )}
                     </div>
                   </td>
                 </tr>
@@ -339,8 +321,6 @@ const Publications = () => {
           </table>
         )}
       </div>
-    </section>
+    </div>
   );
-};
-
-export default Publications;
+}
