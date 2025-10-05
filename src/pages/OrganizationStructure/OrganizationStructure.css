@@ -1,0 +1,156 @@
+/* OrganizationStructure.css */
+
+/* -------------------- Public View -------------------- */
+.public-org-structure {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 20px;
+  font-family: Arial, sans-serif;
+}
+
+.public-org-structure h2 {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.structure-files {
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+}
+
+.structure-file h4 {
+  margin-bottom: 10px;
+  font-size: 16px;
+  color: #333;
+}
+
+.structure-file iframe,
+.structure-file img {
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+/* -------------------- CMS View -------------------- */
+.cms-org-structure {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 20px;
+  font-family: Arial, sans-serif;
+}
+
+.cms-org-structure h2 {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.error-message {
+  background-color: #fdd;
+  color: #900;
+  padding: 10px;
+  margin-bottom: 15px;
+  border: 1px solid #900;
+  border-radius: 5px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.node-form,
+.upload-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.node-form input[type="text"],
+.node-form select,
+.upload-form input[type="file"] {
+  padding: 8px;
+  border-radius: 5px;
+  border: 1px solid #ccc;
+  flex: 1;
+}
+
+.node-form button,
+.upload-form button {
+  padding: 8px 12px;
+  background-color: #2a7ae2;
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.node-form button:disabled,
+.upload-form button:disabled {
+  background-color: #999;
+  cursor: not-allowed;
+}
+
+.files-list ul {
+  list-style: none;
+  padding-left: 0;
+}
+
+.files-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-bottom: 1px solid #eee;
+}
+
+.files-list a {
+  color: #2a7ae2;
+  text-decoration: none;
+}
+
+.files-list button {
+  padding: 4px 8px;
+  background-color: #e22a2a;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.tree-view ul {
+  list-style: none;
+  padding-left: 20px;
+}
+
+.tree-view li {
+  margin-bottom: 5px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.tree-view button {
+  padding: 3px 6px;
+  font-size: 12px;
+  background-color: #2a7ae2;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.tree-view button:nth-child(3) {
+  background-color: #e22a2a;
+}
+
+/* -------------------- Responsive -------------------- */
+@media (max-width: 768px) {
+  .node-form,
+  .upload-form {
+    flex-direction: column;
+  }
+
+  .structure-file iframe,
+  .structure-file img {
+    height: 400px;
+  }
+}

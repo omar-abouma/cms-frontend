@@ -50,6 +50,14 @@ const Sidebar = () => {
             <span>Dashboard</span>
           </Link>
         </li>
+        {/* Home Management */}
+<li className={`menu-item ${location.pathname === "/home-management" ? "active" : ""}`}>
+  <Link to="/home-management" className="menu-content">
+    <FiHome className="menu-icon" />
+    <span>Home Management</span>
+  </Link>
+</li>
+
 
         {/* Media with submenu */}
         <li className={`menu-item ${expandedMenus.media ? "expanded" : ""}`}>
@@ -112,6 +120,14 @@ const Sidebar = () => {
             <span>Services</span>
           </Link>
         </li>
+        {/* Organization Structure */}
+        <li className={`menu-item ${location.pathname === "/organization-structure" ? "active" : ""}`}>
+          <Link to="/organization-structure" className="menu-content">
+            <FiServer className="menu-icon" />
+            <span>Organization Structure</span>
+          </Link>
+        </li>
+
 
         {/* ✅ Staff Management (was Organization Staff before) */}
         <li className={`menu-item ${location.pathname === "/staffmanagement" ? "active" : ""}`}>

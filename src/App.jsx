@@ -12,6 +12,8 @@ import Projects from './pages/Projects/Projects';
 import Publications from './pages/Publications/Publications';
 import Services from './pages/Services/Services';
 import StaffManagement from './pages/StaffManagement/StaffManagement';
+import OrganizationStructure from "./pages/Organizationstructure/Organizationstructure";
+import HomeManagement from "./pages/HomeManagement/HomeManagement";
 
 
 import Layout from './components/Layout';
@@ -179,6 +181,18 @@ function App() {
           />
 
           {/* Other protected pages */}
+          <Route
+            path="/home-management"
+            element={
+              isAuthenticated ? (
+                <Layout onLogout={handleLogout} userData={userData}>
+                  <HomeManagement />
+                </Layout>
+              ) : (
+                <Navigate to="/login" replace />
+              )
+           }
+         />
           <Route 
             path="/news" 
             element={
@@ -269,6 +283,19 @@ function App() {
               )
             } 
           />
+          
+          <Route 
+            path="/organization-structure" 
+            element={
+              isAuthenticated ? (
+                <Layout onLogout={handleLogout} userData={userData}>
+                  <OrganizationStructure />
+                </Layout>
+             ) : (
+               <Navigate to="/login" replace />
+          )
+        } 
+        />
 
           <Route 
             path="/staffmanagement" 
